@@ -3,7 +3,7 @@ use_top_level_dir = true
 
 [licensing]
 detector = "askalono"
-exclude_directories = ["node_modules", "options/license"]
+exclude_directories = ["node_modules", "options/license", "public/assets"]
 exclude = [
     "models/fixtures/notice.yml",
     "models/system/notice.go",
