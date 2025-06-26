@@ -1,0 +1,10 @@
+[Unit]
+Description=One-time configuration for forgejo
+ConditionPathExists=|!/etc/forgejo/conf/app.ini
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+PrivateTmp=true
+
+ExecStart=/usr/libexec/forgejo-init

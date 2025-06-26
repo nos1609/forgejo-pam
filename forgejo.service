@@ -1,0 +1,23 @@
+[Unit]
+Description=Forgejo Git Forge
+Requires=forgejo-init.service
+After=forgejo-init.service
+After=network.target
+
+[Service]
+Type=notify
+User=forgejo
+Group=forgejo
+WorkingDirectory=/var/lib/forgejo
+EnvironmentFile=-/etc/sysconfig/forgejo
+ExecStart=/usr/bin/forgejo web --config /etc/forgejo/conf/app.ini
+Restart=always
+RestartSec=2s
+WatchdogSec=30s
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
