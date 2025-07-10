@@ -106,6 +106,7 @@ patch --input=%{PATCH0} --output=app.ini.tmpl custom/conf/app.example.ini
 
 tar --strip-components=1 -xf %{S:1}
 tar --strip-components=1 -xf %{S:2}
+tar --strip-components=0 -xf %{S:3}
 
 
 %generate_buildrequires
