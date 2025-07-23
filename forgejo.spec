@@ -16,7 +16,7 @@
 %global pagure_migrator_gitrev c9a5694dd2
 
 Name:           forgejo
-Version:        11.0.3
+Version:        12.0.0
 Release:        %autorelease
 Summary:        A lightweight software forge
 
@@ -47,7 +47,7 @@ Source10:       forgejo-node-deps-provides.py
 Source11:       forgejo-node-get-licenses.py
 
 Patch0:         forgejo-10.0.1-app.ini.tmpl.patch
-Patch1:         forgejo-11.0.2-no-esbuild-loader.patch
+Patch1:         forgejo-12.0.0-no-esbuild-loader.patch
 Patch2:         forgejo-11.0.1-webpack-mock-crash.patch
 # Pagure migrator plugin. Generate from the pagure-migrator branch of
 # https://codeberg.org/ryanlerch/forgejo like this (assuming the branch is based off of the
@@ -55,11 +55,6 @@ Patch2:         forgejo-11.0.1-webpack-mock-crash.patch
 # git diff $(git merge-base v12.0/forgejo pagure-migrator) pagure-migrator | \
 #     gzip -9 -c > %%{name}-pagure-migrator-%%{pagure_migrator_gitrev}.patch.gz
 Patch3:         %{name}-pagure-migrator-%{pagure_migrator_gitrev}.patch.gz
-
-
-# Remove shebang from bash autocompletion snippet
-# https://codeberg.org/forgejo/forgejo/pulls/8137
-Patch10:        https://codeberg.org/forgejo/forgejo/pulls/8137.patch
 
 ExclusiveArch:  %golang_arches_future
 
@@ -96,7 +91,6 @@ patch --input=%{PATCH0} --output=app.ini.tmpl custom/conf/app.example.ini
 %patch 1 -p1 -b .no-esbuild-loader
 %patch 2 -p1 -b .webpack-mock-crash
 %patch 3 -p1 -b .pagure-migrator
-%patch 10 -p1 -b .bash-completion
 
 %if %{with bundle_vendored}
 # Bundle vendored sources, then exit.
@@ -123,7 +117,6 @@ else
 %endif
     pushd "%{_builddir}/%{buildsubdir}"
     rm -rf node_modules/
-    npm uninstall esbuild-loader
     npm install --omit=optional --no-save
     rm -r node_modules/*esbuild*
     cd "%{_builddir}"
