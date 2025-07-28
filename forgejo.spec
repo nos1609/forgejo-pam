@@ -60,7 +60,7 @@ Patch1:         forgejo-11.0.2-no-esbuild-loader.patch
 Patch2:         forgejo-11.0.1-webpack-mock-crash.patch
 # Pagure migrator plugin. Generate from the pagure-migrator branch of
 # https://codeberg.org/ryanlerch/forgejo like this (assuming the branch is based off of the
-# v12.0/forge upstream branch):
+# v12.0/forgejo upstream branch):
 # git diff $(git merge-base v12.0/forgejo pagure-migrator) pagure-migrator | \
 #     gzip -9 -c > %%{name}-pagure-migrator-%%{pagure_migrator_gitrev}.patch.gz
 Patch3:         %{name}-pagure-migrator-%{pagure_migrator_gitrev}.patch.gz
@@ -103,7 +103,7 @@ them!
 %autosetup -N -n %{name}
 patch --input=%{PATCH0} --output=app.ini.tmpl custom/conf/app.example.ini
 %patch 1 -p1 -b .no-esbuild-loader
-%patch 2 -p1 -b .webpack-mock-patch
+%patch 2 -p1 -b .webpack-mock-crash
 %patch 3 -p1 -b .pagure-migrator
 %patch 10 -p1 -b .bash-completion
 
