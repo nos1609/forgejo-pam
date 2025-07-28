@@ -16,7 +16,7 @@
 %global pagure_migrator_gitrev c9a5694dd2
 
 Name:           forgejo
-Version:        12.0.0
+Version:        12.0.1
 Release:        %autorelease
 Summary:        A lightweight software forge
 
