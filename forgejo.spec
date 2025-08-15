@@ -17,7 +17,7 @@
 
 Name:           forgejo
 Version:        12.0.1
-Release:        %autorelease.1
+Release:        %autorelease
 Summary:        A lightweight software forge
 
 # CC0-1.0 is normally not permissible for code in Fedora. Because the vendored Go package
@@ -248,7 +248,4 @@ hardlink --ignore-time %{buildroot}
 %attr(0750,%{name},%{name}) %dir %{_sharedstatedir}/%{name}/log
 
 %changelog
-* Fri Aug 15 2025 Maxwell G <maxwell@gtmx.me> - 12.0.1-1.1
-- Rebuild for golang-1.25.0
-
 %autochangelog
