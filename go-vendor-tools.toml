@@ -24,11 +24,6 @@ sha256sum = "d3ba056adc2b7909e95681deaae397fb37c97ed491a920f491214f07b62c41d0"
 expression = "FTL OR GPL-2.0-or-later"
 
 [[licensing.licenses]]
-path = "vendor/github.com/xi2/xz/LICENSE"
-sha256sum = "5c640056d513f276d56635af7a0bed81cb7eac02a31b6e56d40c416557a8d8ce"
-expression = "LicenseRef-Fedora-Public-Domain"
-
-[[licensing.licenses]]
 path = "vendor/github.com/zeebo/blake3/LICENSE"
 sha256sum = "0589f544f68ffc436e6e21efec2cf7cc2dbb2ac09ce6cb8a8cdb75ab74489716"
 expression = "CC0-1.0"
@@ -67,3 +62,8 @@ expression = "MIT AND Apache-2.0"
 path = "vendor/github.com/gogs/chardet/LICENSE"
 sha256sum = "44699611628b82dec802229cd039c401b6df44808eeb5dc873698255a0642d04"
 expression = "ICU AND MIT"
+
+[[licensing.licenses]]
+path = "vendor/go.yaml.in/yaml/v3/LICENSE"
+sha256sum = "d18f6323b71b0b768bb5e9616e36da390fbd39369a81807cca352de4e4e6aa0b"
+expression = "Apache-2.0 AND MIT"
