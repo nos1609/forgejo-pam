@@ -39,11 +39,6 @@ sha256sum = "66550c0ad5ca7ec1e08683e5f872cc45c741f311eee3b8ee484206ecbf9c740d"
 expression = "BSD-3-Clause"
 
 [[licensing.licenses]]
-path = "vendor/github.com/go-webauthn/webauthn/LICENSE"
-sha256sum = "0d30a4e2679f6fd891fa397efd8c188677ca8a1a2761216b789d22270bf770a3"
-expression = "BSD-3-Clause"
-
-[[licensing.licenses]]
 path = "vendor/gopkg.in/yaml.v3/LICENSE"
 sha256sum = "d18f6323b71b0b768bb5e9616e36da390fbd39369a81807cca352de4e4e6aa0b"
 expression = "MIT AND Apache-2.0"
