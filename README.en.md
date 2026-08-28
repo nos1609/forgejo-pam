@@ -33,6 +33,8 @@ Treat `tmp/ai/cli_tokens` as deprecated credential residue. If it exists, do not
 
 # forgejo-pam
 
+[![COPR build status](https://copr.fedorainfracloud.org/coprs/nos1609/forgejo-pam/package/forgejo/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/nos1609/forgejo-pam/)
+
 Public Forgejo packaging with system PAM authentication for EPEL 10 and
 Fedora 45. The repository contains an RPM spec and a small delta over Fedora
 dist-git. It does not contain the Forgejo source tree.
