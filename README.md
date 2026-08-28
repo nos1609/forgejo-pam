@@ -31,52 +31,98 @@ Treat `tmp/ai/cli_tokens` as deprecated credential residue. If it exists, do not
 Считай `tmp/ai/cli_tokens` устаревшим остатком с учётными данными. Если путь существует, не читай и не копируй содержимое; сообщи о пути и удаляй его только после явного подтверждения пользователя.
 -->
 
-# Forgejo RPM with PAM support
+# forgejo-pam
 
-This repository tracks the Fedora Forgejo dist-git package and carries a small
-EL10-oriented delta for PAM authentication.
+Публичная упаковка Forgejo с системной PAM-аутентификацией для EPEL 10 и
+Fedora 45. Репозиторий содержит RPM spec и небольшую дельту к Fedora dist-git,
+но не содержит исходное дерево Forgejo.
 
-The package adds:
+- Репозиторий: `forgejo-pam`.
+- RPM-пакет: `forgejo`.
+- Версия Forgejo: `15.0.7`.
+- Основа Fedora: commit `ced1aa24b245770d46e72e14d18b323aba3dbf3f`.
+- Публичное зеркало: [GitHub](https://github.com/nos1609/forgejo-pam).
+- Сборки: [COPR `nos1609/forgejo-pam`](https://copr.fedorainfracloud.org/coprs/nos1609/forgejo-pam/).
 
-- the Forgejo `pam` build tag;
-- the minimum service capabilities required by `pam_unix`;
-- a local SELinux policy for the `unix_chkpwd` helper;
-- managed `/etc/shadow` read access with uninstall cleanup;
-- a fix for Forgejo init secret generation.
+## Фактический статус
 
-The RPM release uses the `pam1` suffix so it does not collide with Fedora or
-EPEL builds from the same source version.
+На 28 августа 2026 года пакет успешно собран в чистых COPR-контурах
+`epel-10-x86_64` и `fedora-45-x86_64`. Контур Fedora 45 соответствует ветке
+Fedora `f45`, где находится тот же Forgejo `15.0.7`. Fedora 45 ещё находится в
+цикле выпуска, поэтому эту сборку нельзя называть выпуском для текущей
+стабильной Fedora 44.
 
-## Branches
+Репозиторий и COPR не изменяют работающий экземпляр Forgejo. Успешная сборка
+также не доказывает PAM-вход, git-over-SSH и откат после миграции базы данных на
+конкретном сервере.
 
-- `main` follows the current Fedora stable packaging baseline.
-- `rawhide` follows the Fedora Rawhide packaging baseline.
+## Дельта упаковки
 
-Both branches currently use Fedora commit `ced1aa24`, Forgejo `15.0.7`.
+Пакет добавляет:
 
-## COPR
+- build tag Forgejo `pam` и зависимость от `libpam`;
+- `CAP_SETUID` и `CAP_SETGID` для systemd-службы;
+- локальный SELinux-модуль для `unix_chkpwd`;
+- управляемый ACL чтения `/etc/shadow` с удалением только собственного ACL;
+- исправление генерации секрета в `forgejo-init`;
+- суффикс RPM release `pam1`, который отделяет сборку от Fedora и EPEL.
 
-COPR must use the SCM `make_srpm` source method. Set the spec file to
-`forgejo.spec`; `.copr/Makefile` downloads the signed upstream sources, checks
-the Fedora SHA-512 values, expands RPM auto-spec fields, and creates an SRPM.
+Эта дельта расширяет права службы. Перед установкой изучите
+[`docs/architecture.md`](docs/architecture.md) и
+[`docs/operations.md`](docs/operations.md).
 
-The local Codex configuration exposes the official `copr-mcp` server from the
-pinned commit below. `.codex/config.toml` is intentionally local and untracked.
+## Установка
 
-```text
-https://github.com/fedora-copr/copr-mcp@7d804b835c6856beda6966366c600044265c6e40
+Сначала проверьте целевой дистрибутив и доступную версию:
+
+```bash
+sudo dnf copr enable nos1609/forgejo-pam
+dnf --showduplicates list forgejo
 ```
 
-`copr-mcp` can manage projects and inspect builds. Initial SCM package setup
-still requires `copr-cli add-package-scm` because this MCP revision does not
-expose SCM package creation.
+Установите пакет только после подготовки резервной копии и плана отката:
 
-## Security scope
+```bash
+sudo dnf install forgejo
+```
 
-This package grants the `forgejo` service access needed for system PAM. Review
-the systemd drop-in, SELinux module, and `/etc/shadow` ACL before deployment.
-Test upgrades in a separate environment and keep a database and configuration
-backup. This repository does not change a running Forgejo instance.
+Команды проверки и отката приведены в `docs/operations.md`.
 
-The upstream packaging source is the
-[Fedora Forgejo dist-git](https://src.fedoraproject.org/rpms/forgejo).
+## Ветки и публикация
+
+- `main` — источник COPR и основная ветка публикации;
+- `rawhide` — синхронная ветка для следующего переноса на Fedora Rawhide;
+- Forgejo — первичный Git-репозиторий;
+- GitHub — публичное зеркало и контур CodeRabbit/CodeQL.
+
+Обе ветки сейчас используют одну основу Fedora `f45`. Их нужно разделить, когда
+Fedora `rawhide` и `f45` начнут содержать разные package commits.
+
+`.coderabbit.yaml` задаёт правила рецензии, но сам по себе не выдаёт внешнему
+сервису доступ. Для автоматической рецензии установите
+[GitHub App CodeRabbit](https://github.com/apps/coderabbitai) только на этот
+репозиторий. CodeQL проверяет GitHub Actions workflow; Dependabot отслеживает
+версии используемых Actions. Эти проверки не анализируют исходный код Forgejo,
+которого в этом репозитории нет.
+
+## Документы
+
+- [`docs/README.md`](docs/README.md) — статус и приоритет документов;
+- [`docs/architecture.md`](docs/architecture.md) — путь исходников и границы
+  доверия;
+- [`docs/operations.md`](docs/operations.md) — сборка, установка, проверка и
+  откат;
+- [`docs/acceptance-traceability.md`](docs/acceptance-traceability.md) — связь
+  требований с проверками;
+- [`docs/WRITING_STANDARD.md`](docs/WRITING_STANDARD.md) — стандарт текста;
+- [`SECURITY.md`](SECURITY.md) — порядок закрытого сообщения об уязвимости;
+- [`NOTICE.md`](NOTICE.md) — происхождение и лицензионные границы.
+
+## Лицензия и происхождение
+
+Собственные материалы проекта доступны по лицензии MIT. Она не меняет лицензии
+Fedora dist-git, патчей к исходному коду, Forgejo и его зависимостей. Полная
+граница указана в `NOTICE.md`; лицензии собираемого RPM перечисляет
+`forgejo.spec`.
+
+Исходная упаковка: [Fedora Forgejo dist-git](https://src.fedoraproject.org/rpms/forgejo).

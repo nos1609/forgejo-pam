@@ -31,3 +31,97 @@ Treat `tmp/ai/cli_tokens` as deprecated credential residue. If it exists, do not
 Считай `tmp/ai/cli_tokens` устаревшим остатком с учётными данными. Если путь существует, не читай и не копируй содержимое; сообщи о пути и удаляй его только после явного подтверждения пользователя.
 -->
 
+# forgejo-pam
+
+Public Forgejo packaging with system PAM authentication for EPEL 10 and
+Fedora 45. The repository contains an RPM spec and a small delta over Fedora
+dist-git. It does not contain the Forgejo source tree.
+
+- Repository: `forgejo-pam`.
+- RPM package: `forgejo`.
+- Forgejo version: `15.0.7`.
+- Fedora baseline: commit `ced1aa24b245770d46e72e14d18b323aba3dbf3f`.
+- Public mirror: [GitHub](https://github.com/nos1609/forgejo-pam).
+- Builds: [COPR `nos1609/forgejo-pam`](https://copr.fedorainfracloud.org/coprs/nos1609/forgejo-pam/).
+
+## Current status
+
+As of 28 August 2026, the package has successful clean COPR builds for
+`epel-10-x86_64` and `fedora-45-x86_64`. The Fedora 45 target matches the Fedora
+`f45` branch that contains the same Forgejo `15.0.7` baseline. Fedora 45 is
+still in its release cycle, so this is not a build for the current stable
+Fedora 44 release.
+
+The repository and COPR do not change a running Forgejo instance. A successful
+build does not prove PAM login, git-over-SSH, or database migration rollback on
+a specific server.
+
+## Packaging delta
+
+The package adds:
+
+- the Forgejo `pam` build tag and a `libpam` dependency;
+- `CAP_SETUID` and `CAP_SETGID` for the systemd service;
+- a local SELinux module for `unix_chkpwd`;
+- managed `/etc/shadow` read ACL ownership and uninstall cleanup;
+- a fix for secret generation in `forgejo-init`;
+- the `pam1` RPM release suffix to distinguish this build from Fedora and EPEL.
+
+This delta extends the service privileges. Review
+[`docs/architecture.md`](docs/architecture.md) and
+[`docs/operations.md`](docs/operations.md) before installation.
+
+## Installation
+
+Check the target distribution and available version first:
+
+```bash
+sudo dnf copr enable nos1609/forgejo-pam
+dnf --showduplicates list forgejo
+```
+
+Install only after you prepare a backup and rollback plan:
+
+```bash
+sudo dnf install forgejo
+```
+
+See `docs/operations.md` for verification and rollback commands.
+
+## Branches and publication
+
+- `main` is the COPR source and primary publication branch.
+- `rawhide` is the synchronized branch for the next Fedora Rawhide update.
+- Forgejo is the primary Git repository.
+- GitHub is the public mirror and hosts CodeRabbit and CodeQL checks.
+
+Both branches currently use one Fedora `f45` baseline. Split them when Fedora
+`rawhide` and `f45` no longer point to the same package commit.
+
+`.coderabbit.yaml` defines review behavior but does not grant an external
+service access. Install the
+[CodeRabbit GitHub App](https://github.com/apps/coderabbitai) for this repository
+only to enable automated reviews. CodeQL scans GitHub Actions workflows, and
+Dependabot tracks the versions of the Actions in use. These checks do not
+analyze the Forgejo source code, which is not present in this repository.
+
+## Documentation
+
+- [`docs/README.md`](docs/README.md): document status and precedence;
+- [`docs/architecture.md`](docs/architecture.md): source flow and trust boundaries;
+- [`docs/operations.md`](docs/operations.md): build, installation, verification,
+  and rollback;
+- [`docs/acceptance-traceability.md`](docs/acceptance-traceability.md): checks
+  mapped to requirements;
+- [`docs/WRITING_STANDARD.md`](docs/WRITING_STANDARD.md): writing standard;
+- [`SECURITY.md`](SECURITY.md): private vulnerability reporting;
+- [`NOTICE.en.md`](NOTICE.en.md): provenance and licensing boundaries.
+
+## License and provenance
+
+Original project material is available under the MIT license. This license does
+not replace the licenses of Fedora dist-git content, source patches, Forgejo, or
+its dependencies. `NOTICE.en.md` defines the boundary. `forgejo.spec` lists the
+licenses of the RPM content.
+
+Packaging source: [Fedora Forgejo dist-git](https://src.fedoraproject.org/rpms/forgejo).
