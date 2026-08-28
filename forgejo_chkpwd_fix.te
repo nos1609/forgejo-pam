@@ -1,0 +1,8 @@
+module forgejo_chkpwd_fix 1.0;
+
+require {
+    type chkpwd_t;
+    class capability setgid;
+}
+
+allow chkpwd_t self:capability setgid;

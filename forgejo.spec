@@ -14,7 +14,7 @@
 
 Name:           forgejo
 Version:        15.0.7
-Release:        %autorelease
+Release:        %autorelease -e pam1
 Summary:        A lightweight software forge
 
 # CC0-1.0 is normally not permissible for code in Fedora. Because the vendored Go package
@@ -50,22 +50,27 @@ Source8:        forgejo.sysusers.conf
 Source9:        forgejo.sysconfig
 Source10:       forgejo-node-deps-provides.py
 Source11:       forgejo-node-get-licenses.py
+Source12:       forgejo_chkpwd_fix.te
+Source15:       forgejo-pam-caps.conf
 
 Patch0:         forgejo-14.0.2-app.ini.tmpl.patch
 
 ExclusiveArch:  %golang_arches_future
 
 BuildRequires:  coreutils
+BuildRequires:  checkpolicy
 BuildRequires:  gnupg2
 BuildRequires:  go-rpm-macros
 BuildRequires:  golang-bin >= 1.23
 BuildRequires:  golang-src >= 1.23
 BuildRequires:  go-vendor-tools
 BuildRequires:  make
+BuildRequires:  policycoreutils
 BuildRequires:  python3
 # For forgejo-node-get-licenses.py
 # BuildRequires:  python3dist(license-expression)
 BuildRequires:  sed
+BuildRequires:  pam-devel
 BuildRequires:  sqlite-devel
 BuildRequires:  systemd-rpm-macros
 BuildRequires:  util-linux-core
@@ -74,6 +79,12 @@ Requires:       bash
 Requires:       coreutils
 Requires:       git-core
 Requires:       git-lfs
+Requires:       pam
+Requires(post):  policycoreutils
+Requires(post):  acl
+Requires(post):  grep
+Requires(postun): policycoreutils
+Requires(postun): acl
 Requires:       sed
 %{?sysusers_requires_compat}
 
@@ -95,7 +106,7 @@ patch --input=%{PATCH0} --output=app.ini.tmpl custom/conf/app.example.ini
 %build
 # Build manually rather than using the Makefile, so globally defined flags are applied.
 %global gomodulesmode GO111MODULE=on
-%global gotags bindata timetzdata sqlite sqlite_unlock_notify
+%global gotags bindata timetzdata sqlite sqlite_unlock_notify pam
 %global gobuildflags %{?gobuildflags} -tags '%gotags'
 
 go generate -tags '%gotags' ./...
@@ -110,6 +121,9 @@ export GO_LDFLAGS=" \
 "
 %gobuild -o forgejo %{goipath}
 
+checkmodule -M -m -o forgejo_chkpwd_fix.mod %{S:12}
+semodule_package -o forgejo_chkpwd_fix.pp -m forgejo_chkpwd_fix.mod
+
 sed -e 's/gitea/%{name}/g' \
     < contrib/autocompletion/bash_autocomplete \
     > %{name}.complete
@@ -119,7 +133,7 @@ touch -r contrib/autocompletion/bash_autocomplete %{name}.complete
 %go_vendor_license_install -c %{S:3}
 install -m755 -d %{buildroot}%{_defaultlicensedir}/%{name}/public/assets
 install -m644 public/assets/licenses.txt %{buildroot}%{_defaultlicensedir}/%{name}/public/assets/
-install -m755 -d %%{buildroot}{_defaultlicensedir}/%{name}/vendor
+install -m755 -d %{buildroot}%{_defaultlicensedir}/%{name}/vendor
 install -m644 vendor/modules.txt %{buildroot}%{_defaultlicensedir}/%{name}/vendor/
 
 install -m755 -D %{name} %{buildroot}%{_bindir}/%{name}
@@ -131,11 +145,15 @@ install -m755 -d \
 
 install -m644 -p -D app.ini.tmpl %{buildroot}%{_sysconfdir}/%{name}/conf/app.ini.tmpl
 install -m644 -p -D %{S:4} %{buildroot}%{_sysconfdir}/%{name}/public/robots.txt
+install -m755 -d %{buildroot}%{_datadir}/%{name}/selinux
+install -m644 -p -D forgejo_chkpwd_fix.pp %{buildroot}%{_datadir}/%{name}/selinux/forgejo_chkpwd_fix.pp
 install -m644 -p -D %{name}.complete %{buildroot}%{_datadir}/bash-completion/completions/%{name}
 install -m644 -p -D %{S:5} %{buildroot}%{_unitdir}/%{name}.service
 install -m644 -p -D %{S:6} %{buildroot}%{_unitdir}/%{name}-init.service
 install -m755 -p -D %{S:7} %{buildroot}%{_libexecdir}/%{name}-init
 install -m644 -p -D %{S:8} %{buildroot}%{_sysusersdir}/%{name}.conf
+install -m755 -d %{buildroot}%{_unitdir}/%{name}.service.d
+install -m644 -p -D %{S:15} %{buildroot}%{_unitdir}/%{name}.service.d/20-pam-caps.conf
 
 install -m750 -d \
     %{buildroot}%{_sharedstatedir}/%{name} \
@@ -158,14 +176,41 @@ hardlink --ignore-time %{buildroot}
 
 %post
 %systemd_post %{name}.service
-
-
+if command -v semodule >/dev/null 2>&1; then
+    semodule -i %{_datadir}/%{name}/selinux/forgejo_chkpwd_fix.pp >/dev/null 2>&1 || :
+fi
+rpm_state_dir=%{_localstatedir}/lib/rpm-state/%{name}
+shadow_acl_marker="${rpm_state_dir}/shadow-acl-owned"
+if command -v getfacl >/dev/null 2>&1 && command -v setfacl >/dev/null 2>&1; then
+    if [ -e "${shadow_acl_marker}" ]; then
+        setfacl -m u:%{name}:r /etc/shadow >/dev/null 2>&1 || :
+    elif getfacl -cp /etc/shadow 2>/dev/null | grep -Eq '^user:%{name}:'; then
+        :
+    else
+        if mkdir -p "${rpm_state_dir}" >/dev/null 2>&1 && setfacl -m u:%{name}:r /etc/shadow >/dev/null 2>&1; then
+            touch "${shadow_acl_marker}" >/dev/null 2>&1 || setfacl -x u:%{name} /etc/shadow >/dev/null 2>&1 || :
+        fi
+    fi
+fi
 %preun
 %systemd_preun %{name}.service
 
 
 %postun
 %systemd_postun_with_restart %{name}.service
+if [ "$1" -eq 0 ]; then
+    rpm_state_dir=%{_localstatedir}/lib/rpm-state/%{name}
+    shadow_acl_marker="${rpm_state_dir}/shadow-acl-owned"
+    if [ -e "${shadow_acl_marker}" ] && command -v setfacl >/dev/null 2>&1; then
+        if setfacl -x u:%{name} /etc/shadow >/dev/null 2>&1; then
+            rm -f "${shadow_acl_marker}" >/dev/null 2>&1 || :
+            rmdir "${rpm_state_dir}" >/dev/null 2>&1 || :
+        fi
+    fi
+    if command -v semodule >/dev/null 2>&1; then
+        semodule -r forgejo_chkpwd_fix >/dev/null 2>&1 || :
+    fi
+fi
 
 
 %files -f %{go_vendor_license_filelist}
@@ -189,9 +234,14 @@ hardlink --ignore-time %{buildroot}
 
 %{_sysusersdir}/%{name}.conf
 %{_datadir}/bash-completion/completions/%{name}
+%dir %{_datadir}/%{name}
+%dir %{_datadir}/%{name}/selinux
+%{_datadir}/%{name}/selinux/forgejo_chkpwd_fix.pp
 %{_unitdir}/%{name}.service
 %{_unitdir}/%{name}-init.service
 %{_libexecdir}/%{name}-init
+%dir %{_unitdir}/%{name}.service.d
+%{_unitdir}/%{name}.service.d/20-pam-caps.conf
 
 %attr(0750,%{name},%{name}) %dir %{_sharedstatedir}/%{name}
 %attr(0750,%{name},%{name}) %dir %{_sharedstatedir}/%{name}/data
