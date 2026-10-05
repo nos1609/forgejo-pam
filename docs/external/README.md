@@ -1,0 +1,34 @@
+# Снимки документации исходных проектов
+
+Дата фиксации: 2026-10-05.
+
+Конвертация: `markitdown` 0.1.5 (CLI) из сохранённого ответа сервера. После
+конвертации срезаны пробелы в конце строк и пустые строки в конце файла: этого
+требует `git diff --check`. Снимки не править вручную: обновить с `Source` URL из
+заголовка снимка.
+
+Этот репозиторий владеет сборкой и установкой пакета `forgejo`. Сюда паркуются
+источники, по которым принимается решение об обновлении: заметки к выпускам
+Forgejo, расписание поддержки, объявления о безопасности и изменения исходного
+проекта, которых ждёт боевой контур. Снимки по nginx, njs, systemd и SELinux
+хранятся в репозиториях тех компонентов, которым они нужны.
+
+| Снимок | Зачем |
+| --- | --- |
+| [forgejo/2026-10-05/release-schedule.md](forgejo/2026-10-05/release-schedule.md) | Сроки поддержки: 15.0 (LTS) до 15 июля 2027 года, 16.0 до 29 октября 2026 года, 17.0 с 15 октября 2026 года |
+| [forgejo/2026-10-05/release-notes-15.0.4.md](forgejo/2026-10-05/release-notes-15.0.4.md) | Исправления безопасности миграций; `go` toolchain 1.26.5 |
+| [forgejo/2026-10-05/release-notes-15.0.5.md](forgejo/2026-10-05/release-notes-15.0.5.md) | Ссылка на объявление о CVE-2026-20896 и ручное действие |
+| [forgejo/2026-10-05/release-notes-15.0.6.md](forgejo/2026-10-05/release-notes-15.0.6.md) | CGNAT `100.64.0.0/10` в правиле `private`; зависшие задания при медленном `FetchTask` |
+| [forgejo/2026-10-05/release-notes-15.0.7.md](forgejo/2026-10-05/release-notes-15.0.7.md) | Reusable workflows при `pull_request_target`; журналы задач и DBFS |
+| [forgejo/2026-10-05/release-notes-15.0.8.md](forgejo/2026-10-05/release-notes-15.0.8.md) | Исправление с пометкой Critical; директива `go 1.26` |
+| [forgejo/2026-10-05/release-notes-15.0.9.md](forgejo/2026-10-05/release-notes-15.0.9.md) | Исправление с пометкой Critical; проверка обновлений понимает LTS |
+| [forgejo/2026-10-05/release-notes-16.0.0.md](forgejo/2026-10-05/release-notes-16.0.0.md) | Ломающие изменения и новый REST API журналов Actions |
+| [forgejo/2026-10-05/release-notes-16.0.1.md](forgejo/2026-10-05/release-notes-16.0.1.md) | Версия модуля раннера в линии 16.0 |
+| [forgejo/2026-10-05/release-notes-16.0.2.md](forgejo/2026-10-05/release-notes-16.0.2.md) | Те же исправления, что в 15.0.6 |
+| [forgejo/2026-10-05/release-notes-16.0.3.md](forgejo/2026-10-05/release-notes-16.0.3.md) | Те же исправления, что в 15.0.7 |
+| [forgejo/2026-10-05/release-notes-16.0.4.md](forgejo/2026-10-05/release-notes-16.0.4.md) | Те же исправления, что в 15.0.8 |
+| [forgejo/2026-10-05/release-notes-16.0.5.md](forgejo/2026-10-05/release-notes-16.0.5.md) | Те же исправления, что в 15.0.9 |
+| [forgejo/2026-10-05/security-announcement-56.md](forgejo/2026-10-05/security-announcement-56.md) | CVE-2026-20896: кого касается ручное действие в линии 15.0 |
+| [forgejo/2026-10-05/pull-14689.md](forgejo/2026-10-05/pull-14689.md) | Исправление передачи журналов Actions в хранилище и метки переноса в ветки выпусков |
+
+Локальный вывод из этих источников: [upgrade-readiness.md](../upgrade-readiness.md).
