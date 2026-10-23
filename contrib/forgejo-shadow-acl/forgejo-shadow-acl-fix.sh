@@ -8,11 +8,14 @@ acl=$(getfacl -cpe /etc/shadow)
 if grep -qE '^user:forgejo:r[-w][-x][[:space:]]+#effective:r' <<<"$acl"; then
     exit 0
 fi
-# setfacl recalculates the mask, which would also return read to any other entry
-# the mask hides now. Refuse instead of widening access to password hashes.
-if grep -E '^(user:[^:]+|group:[^:]*):r[-w][-x][[:space:]]+#effective:-' <<<"$acl" |
-    grep -qv '^user:forgejo:'; then
-    echo "<3>refusing: the ACL mask on /etc/shadow hides read for another entry; restore u:forgejo:r manually"
+# setfacl recalculates the mask from all group-class entries, which would return
+# every right the mask hides now (read or write) to the other entries. Refuse
+# instead of widening access to password hashes.
+if awk '$1 ~ /^(user:[^:]+|group:[^:]*):/ && $1 !~ /^user:forgejo:/ && $2 ~ /^#effective:/ {
+        n = split($1, entry, ":"); eff = substr($2, 12)
+        if (entry[n] != eff) hidden = 1
+    } END { exit !hidden }' <<<"$acl"; then
+    echo "<3>refusing: the ACL mask on /etc/shadow hides a right of another entry; restore u:forgejo:r manually"
     exit 1
 fi
 setfacl -m u:forgejo:r /etc/shadow
