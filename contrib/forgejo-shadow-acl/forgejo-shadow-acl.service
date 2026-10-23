@@ -1,0 +1,21 @@
+[Unit]
+Description=Reapply Forgejo ACL on /etc/shadow
+Documentation=man:systemd.path(5) man:systemd.unit(5)
+# The ACL belongs to the forgejo package only while its RPM marker exists.
+ConditionPathExists=/var/lib/rpm-state/forgejo/shadow-acl-owned
+# Hitting the start limit fails the path unit as well (systemd.path(5)).
+# The 3 s debounce below allows at most ~3 starts per 10 s.
+StartLimitIntervalSec=10s
+StartLimitBurst=10
+
+[Service]
+Type=oneshot
+# Debounce: events during the pause merge into this run, the check comes after it.
+ExecStartPre=/usr/bin/sleep 3
+ExecStart=/usr/local/sbin/forgejo-shadow-acl-fix.sh
+Nice=19
+IOSchedulingClass=idle
+LogLevelMax=notice
+NoNewPrivileges=yes
+PrivateNetwork=yes
+ProtectHome=yes
