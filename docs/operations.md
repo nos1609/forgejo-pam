@@ -184,9 +184,11 @@ systemctl cat forgejo
 systemctl show forgejo -p AmbientCapabilities
 getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
 semodule -l | grep '^forgejo_chkpwd_fix'
-systemctl is-active forgejo-shadow-acl.path forgejo-shadow-acl.timer
 journalctl -u forgejo -b --no-pager
 ```
+
+Если на хосте уже установлена защита ACL из следующего раздела, выполните и её
+проверку.
 
 Отдельно проверьте PAM-вход, обычный вход, git-over-HTTP, git-over-SSH и Actions.
 Не помещайте пароль, OTP, cookie, приватный ключ и содержимое `app.ini` в журнал
