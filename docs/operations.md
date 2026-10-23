@@ -34,7 +34,10 @@ Ruleset `protect-rawhide-history` запрещает удаление и пер�
    выполните локальные проверки, при изменении spec соберите SRPM.
 3. Опубликуйте ветку в GitHub и откройте PR в `main`. CodeRabbit в открытом
    репозитории запускается комментарием `@coderabbitai review`.
-4. Исправьте замечания, разрешите обсуждения, дождитесь проверок.
+4. Исправьте замечания, разрешите обсуждения, дождитесь проверок. Статус
+   `CodeRabbit: pass` ставится и тогда, когда ревью пропущено, например при
+   исчерпанном бесплатном лимите для открытых репозиториев. Приёмкой считается
+   только опубликованный в PR review CodeRabbit по последнему commit ветки.
 5. Выберите способ merge:
    - перенос версии из Fedora — merge commit: он сохраняет merge commit со
      стратегией `ours`, без которого `rpmautospec` обрывает changelog;
@@ -106,14 +109,26 @@ COPR не получает webhook: после публикации `main` за�
 - `epel-10-x86_64`;
 - `fedora-45-x86_64`.
 
-Запустите сборку сохранённого SCM package:
+Соберите точный commit `main`, а не ветку:
 
 ```bash
-copr-cli build-package forgejo-pam \
-  --name forgejo \
+git fetch github
+sha=$(git rev-parse github/main)
+copr-cli buildscm forgejo-pam \
+  --clone-url https://github.com/nos1609/forgejo-pam.git \
+  --commit "$sha" \
+  --spec forgejo.spec \
+  --method make_srpm \
   --chroot epel-10-x86_64 \
   --chroot fedora-45-x86_64
 ```
+
+Сохранённый SCM package (`copr-cli build-package forgejo-pam --name forgejo`)
+выполняет `git checkout main` в момент сборки и не записывает commit в
+metadata: если `main` сдвинется между запуском и сборкой, соберётся другой
+источник. `buildscm` записывает переданный SHA в параметры сборки. Build
+`11196643` (23 октября 2026 года) собран через `build-package`; команда
+`buildscm` выше рекомендована и ещё не применялась.
 
 Считайте сборку успешной только после статуса `succeeded` для каждого chroot,
 `Child return code was: 0` и наличия ожидаемых RPM в result metadata.
@@ -130,14 +145,35 @@ dnf --showduplicates list forgejo
 
 ## Проверка RPM до установки
 
+Проверяйте каждый chroot и каждый RPM отдельно. Результаты остаются в `tmp/ai/`,
+ключ COPR-проекта импортируется в отдельный keyring:
+
 ```bash
-rpm -qp --requires ./forgejo-*.rpm | grep -E 'libpam|pam'
-rpm -qpl ./forgejo-*.rpm | grep -E '20-pam-caps|forgejo_chkpwd_fix|forgejo-init'
-rpmkeys --checksig ./forgejo-*.rpm
+build=<build ID>
+dir="tmp/ai/copr-build-$build"
+mkdir -p "$dir/rpmdb"
+curl -fsS -o "$dir/pubkey.gpg" \
+  https://download.copr.fedorainfracloud.org/results/nos1609/forgejo-pam/pubkey.gpg
+rpmkeys --dbpath "$dir/rpmdb" --import "$dir/pubkey.gpg"
+for chroot in epel-10-x86_64 fedora-45-x86_64; do
+  copr-cli download-build --rpms --chroot "$chroot" --dest "$dir" "$build"
+done
+for rpm in "$dir"/*/forgejo-[0-9]*.x86_64.rpm; do
+  echo "== $rpm"
+  rpmkeys --dbpath "$dir/rpmdb" --checksig "$rpm"
+  rpm -qp --requires "$rpm" | grep -qx 'libpam.so.0()(64bit)' \
+    && echo "ok libpam.so.0" || echo "MISSING libpam.so.0"
+  for f in /usr/lib/systemd/system/forgejo.service.d/20-pam-caps.conf \
+           /usr/share/forgejo/selinux/forgejo_chkpwd_fix.pp \
+           /usr/libexec/forgejo-init; do
+    rpm -qpl "$rpm" | grep -qx "$f" && echo "ok $f" || echo "MISSING $f"
+  done
+done
 ```
 
-Проверку подписи выполняйте с ключом конкретного COPR-проекта в отдельном RPM
-keyring или после штатного подключения репозитория.
+Для каждого RPM ожидается `digests signatures OK`, строка `ok` для
+`libpam.so.0` и для каждого файла payload. Строка `MISSING` или другой результат
+`--checksig` запрещает установку.
 
 ## Проверка после установки
 
@@ -146,7 +182,7 @@ forgejo --version
 ldd /usr/bin/forgejo | grep libpam
 systemctl cat forgejo
 systemctl show forgejo -p AmbientCapabilities
-getfacl -cp /etc/shadow | grep '^user:forgejo:r--'
+getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
 semodule -l | grep '^forgejo_chkpwd_fix'
 systemctl is-active forgejo-shadow-acl.path forgejo-shadow-acl.timer
 journalctl -u forgejo -b --no-pager
@@ -168,7 +204,8 @@ PAM-вход читает `/etc/shadow` через ACL `u:forgejo:r`, котор
 Утилиты shadow-utils (`useradd`, `usermod`, `userdel`, `passwd`, `chpasswd`) не
 правят `/etc/shadow` на месте: они пишут новый файл и подменяют старый через
 `rename`. У нового файла ACL нет, и PAM-вход перестаёт работать до следующей
-установки пакета.
+установки пакета. Тот же результат даёт `chmod`, который сужает маску ACL: запись
+`user:forgejo:r--` остаётся, но effective-права чтения нет.
 
 Наблюдение за самим файлом (`PathChanged=/etc/shadow`) эту подмену не видит.
 По `systemd.path(5)` `PathChanged=` срабатывает, когда закрывается файл,
@@ -204,8 +241,10 @@ flowchart LR
   удаления пакета ACL не возвращается.
 - `Nice=19`, `IOSchedulingClass=idle` и `LogLevelMax=notice`: холостые запуски
   не пишутся в журнал, восстановление пишется с уровнем `warning`.
-- Скрипт меняет ACL, только если записи нет. Собственный `setfacl` тоже событие
-  в `/etc`; без этой проверки path unit запускал бы service по кругу.
+- Скрипт проверяет effective-право по `getfacl -e` и меняет ACL, только если
+  `forgejo` не может читать файл. `setfacl -m` без `-n` пересчитывает маску и
+  возвращает чтение. Собственный `setfacl` тоже событие в `/etc`; без этой
+  проверки path unit запускал бы service по кругу.
 
 ### Установка
 
@@ -234,25 +273,31 @@ sudo systemctl enable --now forgejo-shadow-acl.path forgejo-shadow-acl.timer
 ```bash
 systemctl is-active forgejo-shadow-acl.path forgejo-shadow-acl.timer
 systemctl list-timers forgejo-shadow-acl.timer --no-pager
-sudo getfacl -cp /etc/shadow | grep '^user:forgejo:r'
+sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
 ```
 
-Контрольное снятие ACL. PAM-вход недоступен около трёх секунд:
+Контрольные отказы. PAM-вход недоступен около трёх секунд в каждом:
 
 ```bash
-sudo setfacl -x u:forgejo /etc/shadow
+sudo setfacl -x u:forgejo /etc/shadow   # запись ACL снята
 sleep 5
-sudo getfacl -cp /etc/shadow | grep '^user:forgejo:r'
+sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
+sudo chmod g-r /etc/shadow              # маска сужена, запись осталась
+sleep 5
+sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
 sudo journalctl -u forgejo-shadow-acl.service -p warning --since -1min --no-pager
 ```
 
-Ожидается запись `user:forgejo:r--` и строка
-`reapplied u:forgejo:r on /etc/shadow`. Если ACL не вернулся, восстановите его
-командой `sudo setfacl -m u:forgejo:r /etc/shadow` и перейдите к диагностике.
+После каждого отказа ожидается строка `user:forgejo:r--` с `#effective:r--`, в
+журнале — `reapplied u:forgejo:r on /etc/shadow`. Если ACL не вернулся,
+восстановите его командой `sudo setfacl -m u:forgejo:r /etc/shadow` и перейдите
+к диагностике.
 
-Результат 23 октября 2026 года: ACL вернулся через 3,2 секунды. Создание и
-удаление файла в `/etc`, подмена через `rename`, 500 `touch` подряд и 300 `touch`
-с интервалом 5 мс дали по одному запуску service; path unit остался `active`.
+Результат 23 октября 2026 года на одном хосте: снятая запись вернулась через
+3,2 секунды, суженная маска — примерно через 2 секунды, итоговый ACL совпал с
+исходным. Создание и удаление файла в `/etc`, подмена через `rename`, 500
+`touch` подряд и 300 `touch` с интервалом 5 мс дали по одному запуску service;
+path unit остался `active`.
 
 ### Диагностика
 
