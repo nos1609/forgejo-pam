@@ -6,16 +6,17 @@
 
 ## Фактический статус
 
-Основа пакета — Fedora dist-git commit
-`ced1aa24b245770d46e72e14d18b323aba3dbf3f`, Forgejo `15.0.7`. COPR-проект
-`nos1609/forgejo-pam` использует SCM `make_srpm`, публичный GitHub `main` и
-отключённую сеть в binary build chroot.
+Статус на 23 октября 2026 года. Основа пакета — Fedora dist-git commit
+`7e49254f963a7c488c654af213fee4e3e6b2c815`, Forgejo `15.0.10`; `main` и
+`rawhide` — `764bcd1`. COPR-проект `nos1609/forgejo-pam` использует SCM
+`make_srpm`, публичный GitHub `main` и отключённую сеть в binary build chroot.
 
-Чистые сборки подтверждены COPR build `10915732` для `epel-10-x86_64` и build
-`10915756` для `fedora-45-x86_64`. Fedora 45 ответвилась от Rawhide 11 августа
-2026 года; ветка Fedora `f45` содержит ту же основу Forgejo `15.0.7`.
+Чистые сборки подтверждены COPR build `11196643` для `epel-10-x86_64` и
+`fedora-45-x86_64`. Ветки Fedora `rawhide` и `f45` содержат ту же основу.
 
-Установка и проверка работающего Forgejo остаются отдельным этапом.
+Установка остаётся отдельным этапом. 23 октября 2026 года сборка `11196643`
+установлена на боевой контур поверх 15.0.3; результат проверок — в
+[`acceptance-traceability.md`](acceptance-traceability.md).
 
 ## Действующие документы
 
