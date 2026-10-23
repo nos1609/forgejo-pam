@@ -10,7 +10,7 @@ Forgejo и не управляет работающим сервером.
 
 ```mermaid
 flowchart LR
-    FEDORA["Fedora dist-git<br/>commit ced1aa2"]
+    FEDORA["Fedora dist-git<br/>commit 7e49254, Forgejo 15.0.10<br/>на 23 октября 2026 года"]
     PRIMARY["Forgejo Git<br/>первичный репозиторий"]
     GITHUB["GitHub<br/>публичное зеркало"]
     SOURCE["COPR source build<br/>SCM make_srpm"]

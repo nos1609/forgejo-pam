@@ -195,7 +195,7 @@ forgejo --version
 ldd /usr/bin/forgejo | grep libpam
 systemctl cat forgejo
 systemctl show forgejo -p AmbientCapabilities
-getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
+getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r--[[:space:]]+#effective:r--$'
 semodule -l | grep '^forgejo_chkpwd_fix'
 journalctl -u forgejo -b --no-pager
 ```
@@ -255,16 +255,18 @@ flowchart LR
   По `systemd.path(5)` превышение лимита service переводит path unit в failed, и
   он перестаёт следить.
 - `ConditionPathExists=` на маркер пакета в `/var/lib/rpm-state/forgejo/`: после
-  удаления пакета ACL не возвращается. Без маркера защита не действует, см.
-  «Установка».
+  удаления пакета ACL не возвращается. Условие проверяется до паузы, поэтому
+  скрипт проверяет маркер ещё раз: если `%postun` удалил пакет во время паузы,
+  ACL не вернётся. Без маркера защита не действует, см. «Установка».
 - `Nice=19`, `IOSchedulingClass=idle` и `LogLevelMax=notice`: холостые запуски
   не пишутся в журнал, восстановление пишется с уровнем `warning`, отказ — с
   уровнем `err`.
-- Скрипт проверяет effective-право по `getfacl -e`:
-  - `forgejo` читает файл — ничего не делает. Собственный `setfacl` тоже событие
-    в `/etc`; без этой проверки path unit запускал бы service по кругу;
-  - ACL нет или снята только запись `forgejo` — выполняет
-    `setfacl -m u:forgejo:r`;
+- Скрипт проверяет запись и effective-право по `getfacl -e`:
+  - запись `user:forgejo:r--` с `#effective:r--` — ничего не делает.
+    Собственный `setfacl` также создаёт событие в `/etc`; без этой проверки path
+    unit запускал бы service по кругу;
+  - ACL нет, снята только запись `forgejo` или у неё права шире `r--` —
+    выполняет `setfacl -m u:forgejo:r`;
   - маска скрывает любое право (чтение или запись) другой записи группового
     класса: именованного пользователя, `group::`, именованной группы. Скрипт
     отказывается менять ACL и завершается с кодом 1: `setfacl -m` без `-n`
@@ -319,7 +321,7 @@ sudo systemctl enable --now forgejo-shadow-acl.path forgejo-shadow-acl.timer
 ```bash
 systemctl is-active forgejo-shadow-acl.path forgejo-shadow-acl.timer
 systemctl list-timers forgejo-shadow-acl.timer --no-pager
-sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
+sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r--[[:space:]]+#effective:r--$'
 ```
 
 Контрольный отказ. PAM-вход недоступен около трёх секунд:
@@ -327,11 +329,11 @@ sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#eff
 ```bash
 sudo setfacl -x u:forgejo /etc/shadow
 sleep 5
-sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
+sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r--[[:space:]]+#effective:r--$'
 sudo journalctl -u forgejo-shadow-acl.service -p warning --since -1min --no-pager
 ```
 
-Ожидается строка `user:forgejo:r--` с `#effective:r--`, в журнале —
+Ожидается ровно `user:forgejo:r--` с `#effective:r--`, в журнале —
 `reapplied u:forgejo:r on /etc/shadow`. Если ACL не вернулся, восстановите его
 командой `sudo setfacl -m u:forgejo:r /etc/shadow` и перейдите к диагностике.
 Отказ при суженной маске на `/etc/shadow` не воспроизводите: он оставляет PAM без
@@ -383,6 +385,7 @@ ls -l /var/lib/rpm-state/forgejo/shadow-acl-owned
 
 ```bash
 sudo systemctl disable --now forgejo-shadow-acl.timer forgejo-shadow-acl.path
+sudo systemctl stop forgejo-shadow-acl.service
 sudo rm /etc/systemd/system/forgejo-shadow-acl.path \
   /etc/systemd/system/forgejo-shadow-acl.service \
   /etc/systemd/system/forgejo-shadow-acl.timer \

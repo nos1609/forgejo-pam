@@ -1,11 +1,14 @@
 #!/usr/bin/bash
-# Reapply u:forgejo:r on /etc/shadow only when forgejo cannot read it. shadow-utils
-# replaces the file on every account change and the new inode has no ACL; chmod
-# can also narrow the ACL mask and leave the entry without effective read.
+# Reapply u:forgejo:r on /etc/shadow when the entry is not exactly r-- with
+# effective r--. shadow-utils replaces the file on every account change and the
+# new inode has no ACL; chmod can also narrow the ACL mask.
 # Any write here is itself an /etc event, so a no-op run must not touch the file.
 set -euo pipefail
+# ConditionPathExists= is checked before the 3 s pause; %postun may remove the
+# package, its ACL and this marker meanwhile. Check again so the ACL stays gone.
+[ -e /var/lib/rpm-state/forgejo/shadow-acl-owned ] || exit 0
 acl=$(getfacl -cpe /etc/shadow)
-if grep -qE '^user:forgejo:r[-w][-x][[:space:]]+#effective:r' <<<"$acl"; then
+if grep -qE '^user:forgejo:r--[[:space:]]+#effective:r--$' <<<"$acl"; then
     exit 0
 fi
 # setfacl recalculates the mask from all group-class entries, which would return
