@@ -359,12 +359,25 @@ ls -l /var/lib/rpm-state/forgejo/shadow-acl-owned
 - `ConditionPathExists=` не выполнено: маркера пакета нет, ACL пакету не
   принадлежит. Порядок передачи ACL пакету — в «Установке».
 - В журнале `refusing: the ACL mask on /etc/shadow hides a right of another entry`,
-  service в состоянии failed: маска скрывает права другой записи. Посмотрите
-  `sudo getfacl -cpe /etc/shadow` и решите, должна ли эта запись получить свои
-  права к файлу. Если нет — удалите её через `setfacl -x` или уменьшите её права
-  до effective, если да — оставьте. Затем выполните
-  `sudo setfacl -m u:forgejo:r /etc/shadow` и
-  `sudo systemctl reset-failed forgejo-shadow-acl.service`.
+  service в состоянии failed: маска скрывает права другой записи. Не
+  пересчитывайте маску, пока не разобраны все такие записи. `setfacl` без `-n`
+  пересчитывает её сразу: например, `setfacl -x` одной записи открывает скрытое
+  чтение остальных.
+  1. `sudo getfacl -cpe /etc/shadow`: найдите записи группового класса, у
+     которых права в записи шире `#effective`.
+  2. Для каждой решите, с флагом `-n`:
+     - удалить: `sudo setfacl -n -x u:<имя> /etc/shadow` (для группы — `g:<имя>`);
+     - сузить до effective: `sudo setfacl -n -m u:<имя>:<права> /etc/shadow`,
+       для `group::` — `sudo setfacl -n -m g::<права> /etc/shadow`;
+     - оставить, если запись должна получить свои права.
+  3. Повторите `sudo getfacl -cpe /etc/shadow`. У каждой оставшейся записи права
+     в записи совпадают с `#effective`, кроме тех, что оставлены сознательно.
+  4. `sudo setfacl -m u:forgejo:r /etc/shadow`, затем
+     `sudo systemctl reset-failed forgejo-shadow-acl.service`.
+
+  Порядок проверен на временном файле 23 октября 2026 года: `setfacl -x` без
+  `-n` открыл скрытое чтение двух записей, с `-n` маска осталась `---` до
+  финальной команды.
 
 ### Откат
 
