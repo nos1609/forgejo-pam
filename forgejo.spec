@@ -13,7 +13,7 @@
 %global __node_deps_path ^%{_bindir}/%{name}$
 
 Name:           forgejo
-Version:        15.0.7
+Version:        15.0.10
 Release:        %autorelease -e pam1
 Summary:        A lightweight software forge
 
