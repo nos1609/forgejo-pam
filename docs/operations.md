@@ -127,8 +127,10 @@ copr-cli buildscm forgejo-pam \
 выполняет `git checkout main` в момент сборки и не записывает commit в
 metadata: если `main` сдвинется между запуском и сборкой, соберётся другой
 источник. `buildscm` записывает переданный SHA в параметры сборки. Build
-`11196643` (23 октября 2026 года) собран через `build-package`; команда
-`buildscm` выше рекомендована и ещё не применялась.
+`11196643` (23 октября 2026 года) собран через `build-package`; его связь с
+commit `764bcd1` подтверждена сверкой SRPM, см.
+[`acceptance-traceability.md`](acceptance-traceability.md). Команда `buildscm`
+выше рекомендована и ещё не применялась.
 
 Считайте сборку успешной только после статуса `succeeded` для каждого chroot,
 `Child return code was: 0` и наличия ожидаемых RPM в result metadata.
@@ -146,34 +148,45 @@ dnf --showduplicates list forgejo
 ## Проверка RPM до установки
 
 Проверяйте каждый chroot и каждый RPM отдельно. Результаты остаются в `tmp/ai/`,
-ключ COPR-проекта импортируется в отдельный keyring:
+ключ COPR-проекта импортируется в отдельный keyring; `rpmkeys --dbpath` требует
+абсолютный путь. Блок завершается с кодом 1 при любой ошибке загрузки, при
+отсутствии RPM для chroot, при ошибке подписи и при любом `MISSING`:
 
 ```bash
 build=<build ID>
-dir="tmp/ai/copr-build-$build"
+dir="$PWD/tmp/ai/copr-build-$build"
+fail=0
 mkdir -p "$dir/rpmdb"
 curl -fsS -o "$dir/pubkey.gpg" \
-  https://download.copr.fedorainfracloud.org/results/nos1609/forgejo-pam/pubkey.gpg
-rpmkeys --dbpath "$dir/rpmdb" --import "$dir/pubkey.gpg"
+  https://download.copr.fedorainfracloud.org/results/nos1609/forgejo-pam/pubkey.gpg || fail=1
+rpmkeys --dbpath "$dir/rpmdb" --import "$dir/pubkey.gpg" || fail=1
 for chroot in epel-10-x86_64 fedora-45-x86_64; do
-  copr-cli download-build --rpms --chroot "$chroot" --dest "$dir" "$build"
-done
-for rpm in "$dir"/*/forgejo-[0-9]*.x86_64.rpm; do
-  echo "== $rpm"
-  rpmkeys --dbpath "$dir/rpmdb" --checksig "$rpm"
-  rpm -qp --requires "$rpm" | grep -qx 'libpam.so.0()(64bit)' \
-    && echo "ok libpam.so.0" || echo "MISSING libpam.so.0"
-  for f in /usr/lib/systemd/system/forgejo.service.d/20-pam-caps.conf \
-           /usr/share/forgejo/selinux/forgejo_chkpwd_fix.pp \
-           /usr/libexec/forgejo-init; do
-    rpm -qpl "$rpm" | grep -qx "$f" && echo "ok $f" || echo "MISSING $f"
+  if ! copr-cli download-build --rpms --chroot "$chroot" --dest "$dir" "$build" >/dev/null; then
+    echo "FAIL download $chroot"; fail=1; continue
+  fi
+  rpms=("$dir/$chroot"/forgejo-[0-9]*.x86_64.rpm)
+  if [ ! -e "${rpms[0]}" ]; then
+    echo "FAIL no forgejo RPM for $chroot"; fail=1; continue
+  fi
+  for rpm in "${rpms[@]}"; do
+    echo "== $rpm"
+    rpmkeys --dbpath "$dir/rpmdb" --checksig "$rpm" || fail=1
+    rpm -qp --requires "$rpm" | grep -qx 'libpam.so.0()(64bit)' \
+      || { echo "MISSING libpam.so.0"; fail=1; }
+    for f in /usr/lib/systemd/system/forgejo.service.d/20-pam-caps.conf \
+             /usr/share/forgejo/selinux/forgejo_chkpwd_fix.pp \
+             /usr/libexec/forgejo-init; do
+      rpm -qpl "$rpm" | grep -qx "$f" || { echo "MISSING $f"; fail=1; }
+    done
   done
 done
+if [ "$fail" -ne 0 ]; then echo "RPM checks FAILED"; false; else echo "RPM checks passed"; fi
 ```
 
-Для каждого RPM ожидается `digests signatures OK`, строка `ok` для
-`libpam.so.0` и для каждого файла payload. Строка `MISSING` или другой результат
-`--checksig` запрещает установку.
+Для каждого RPM ожидается `digests signatures OK`, в конце — `RPM checks passed`.
+`RPM checks FAILED` запрещает установку. Проверено 23 октября 2026 года: build
+`11196643` — `passed`; RPM с изменённым байтом — `FAILED` по подписи;
+несуществующий chroot — `FAILED`, потому что RPM для него нет.
 
 ## Проверка после установки
 
@@ -207,7 +220,9 @@ PAM-вход читает `/etc/shadow` через ACL `u:forgejo:r`, котор
 правят `/etc/shadow` на месте: они пишут новый файл и подменяют старый через
 `rename`. У нового файла ACL нет, и PAM-вход перестаёт работать до следующей
 установки пакета. Тот же результат даёт `chmod`, который сужает маску ACL: запись
-`user:forgejo:r--` остаётся, но effective-права чтения нет.
+`user:forgejo:r--` остаётся, но effective-права чтения нет. Этот случай защита
+не исправляет сама, если вместе с `forgejo` маска скрывает чтение у другой
+записи: см. «Устройство».
 
 Наблюдение за самим файлом (`PathChanged=/etc/shadow`) эту подмену не видит.
 По `systemd.path(5)` `PathChanged=` срабатывает, когда закрывается файл,
@@ -223,7 +238,7 @@ flowchart LR
     PATH["forgejo-shadow-acl.path<br/>PathChanged=/etc"]
     TIMER["forgejo-shadow-acl.timer<br/>раз в 15 минут"]
     SVC["forgejo-shadow-acl.service<br/>пауза 3 с, лимит запусков"]
-    FIX["forgejo-shadow-acl-fix.sh<br/>setfacl только при отсутствии ACL"]
+    FIX["forgejo-shadow-acl-fix.sh<br/>setfacl или отказ<br/>без расширения доступа"]
 
     SU --> ETC --> PATH --> SVC
     TIMER --> SVC
@@ -240,15 +255,43 @@ flowchart LR
   По `systemd.path(5)` превышение лимита service переводит path unit в failed, и
   он перестаёт следить.
 - `ConditionPathExists=` на маркер пакета в `/var/lib/rpm-state/forgejo/`: после
-  удаления пакета ACL не возвращается.
+  удаления пакета ACL не возвращается. Без маркера защита не действует, см.
+  «Установка».
 - `Nice=19`, `IOSchedulingClass=idle` и `LogLevelMax=notice`: холостые запуски
-  не пишутся в журнал, восстановление пишется с уровнем `warning`.
-- Скрипт проверяет effective-право по `getfacl -e` и меняет ACL, только если
-  `forgejo` не может читать файл. `setfacl -m` без `-n` пересчитывает маску и
-  возвращает чтение. Собственный `setfacl` тоже событие в `/etc`; без этой
-  проверки path unit запускал бы service по кругу.
+  не пишутся в журнал, восстановление пишется с уровнем `warning`, отказ — с
+  уровнем `err`.
+- Скрипт проверяет effective-право по `getfacl -e`:
+  - `forgejo` читает файл — ничего не делает. Собственный `setfacl` тоже событие
+    в `/etc`; без этой проверки path unit запускал бы service по кругу;
+  - ACL нет или снята только запись `forgejo` — выполняет
+    `setfacl -m u:forgejo:r`;
+  - маска скрывает чтение у другой записи группового класса (именованный
+    пользователь, `group::`, именованная группа) — отказывается менять ACL и
+    завершается с кодом 1. `setfacl -m` без `-n` пересчитывает маску и вернул
+    бы чтение хешей паролей и этой записи.
 
 ### Установка
+
+Сначала проверьте маркер пакета:
+
+```bash
+sudo ls -l /var/lib/rpm-state/forgejo/shadow-acl-owned
+```
+
+Маркера нет, если запись `u:forgejo` на `/etc/shadow` существовала до установки
+RPM: `%post` такой ACL не присваивает. На таком хосте защита не сработает, потому
+что `ConditionPathExists=` пропустит service. Передайте ACL пакету, затем
+устанавливайте защиту:
+
+```bash
+sudo setfacl -x u:forgejo /etc/shadow
+sudo dnf reinstall forgejo
+sudo ls -l /var/lib/rpm-state/forgejo/shadow-acl-owned
+```
+
+Между первыми двумя командами PAM-вход недоступен; `dnf reinstall` перезапускает
+Forgejo. `%post` видит, что записи нет, ставит ACL и создаёт маркер. Не создавайте
+маркер вручную: при удалении пакета `%postun` снимет отмеченный ACL как свой.
 
 ```bash
 sudo install -m 0644 -o root -g root \
@@ -278,28 +321,27 @@ systemctl list-timers forgejo-shadow-acl.timer --no-pager
 sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
 ```
 
-Контрольные отказы. PAM-вход недоступен около трёх секунд в каждом:
+Контрольный отказ. PAM-вход недоступен около трёх секунд:
 
 ```bash
-sudo setfacl -x u:forgejo /etc/shadow   # запись ACL снята
-sleep 5
-sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
-sudo chmod g-r /etc/shadow              # маска сужена, запись осталась
+sudo setfacl -x u:forgejo /etc/shadow
 sleep 5
 sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r[-w][-x][[:space:]]+#effective:r'
 sudo journalctl -u forgejo-shadow-acl.service -p warning --since -1min --no-pager
 ```
 
-После каждого отказа ожидается строка `user:forgejo:r--` с `#effective:r--`, в
-журнале — `reapplied u:forgejo:r on /etc/shadow`. Если ACL не вернулся,
-восстановите его командой `sudo setfacl -m u:forgejo:r /etc/shadow` и перейдите
-к диагностике.
+Ожидается строка `user:forgejo:r--` с `#effective:r--`, в журнале —
+`reapplied u:forgejo:r on /etc/shadow`. Если ACL не вернулся, восстановите его
+командой `sudo setfacl -m u:forgejo:r /etc/shadow` и перейдите к диагностике.
+Отказ при суженной маске на `/etc/shadow` не воспроизводите: он оставляет PAM без
+доступа до ручного восстановления.
 
-Результат 23 октября 2026 года на одном хосте: снятая запись вернулась через
-3,2 секунды, суженная маска — примерно через 2 секунды, итоговый ACL совпал с
-исходным. Создание и удаление файла в `/etc`, подмена через `rename`, 500
-`touch` подряд и 300 `touch` с интервалом 5 мс дали по одному запуску service;
-path unit остался `active`.
+Результаты 23 октября 2026 года. На хосте: снятая запись вернулась через 3,2
+секунды; создание и удаление файла в `/etc`, подмена через `rename`, 500 `touch`
+подряд и 300 `touch` с интервалом 5 мс дали по одному запуску service; path unit
+остался `active`. На временных файлах с той же логикой: файл без ACL и файл без
+записи `forgejo` исправлены; при скрытом маской чтении у `group::` или у другого
+пользователя скрипт завершился с кодом 1 и не изменил ACL.
 
 ### Диагностика
 
@@ -313,7 +355,13 @@ ls -l /var/lib/rpm-state/forgejo/shadow-acl-owned
   `sudo systemctl reset-failed forgejo-shadow-acl.path forgejo-shadow-acl.service`
   и `sudo systemctl restart forgejo-shadow-acl.path`.
 - `ConditionPathExists=` не выполнено: маркера пакета нет, ACL пакету не
-  принадлежит. Ставить ACL вручную в этом случае не нужно.
+  принадлежит. Порядок передачи ACL пакету — в «Установке».
+- В журнале `refusing: the ACL mask on /etc/shadow hides read for another entry`,
+  service в состоянии failed: маска скрывает чтение у другой записи. Посмотрите
+  `sudo getfacl -cpe /etc/shadow` и решите, должна ли эта запись читать файл.
+  Если нет — удалите её через `setfacl -x`, если да — оставьте. Затем выполните
+  `sudo setfacl -m u:forgejo:r /etc/shadow` и
+  `sudo systemctl reset-failed forgejo-shadow-acl.service`.
 
 ### Откат
 

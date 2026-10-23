@@ -8,6 +8,7 @@
 | Публичный источник и совпадение refs | `git ls-remote` для `main` и `rawhide` в Forgejo и GitHub, сравнение OID попарно | 23 октября 2026 года: `main` Forgejo = `main` GitHub = `764bcd14cb85b03a61064b108c5efabdbbbc30ae`; `rawhide` Forgejo = `rawhide` GitHub = тот же OID |
 | Точная основа Fedora | `git ls-remote` для Fedora `f45` и `git rev-parse` | `7e49254f963a7c488c654af213fee4e3e6b2c815`, Forgejo 15.0.10 |
 | Проверка source archive | Source build и RPM `%prep` | COPR source stage `11196643` успешен; локальный `%prep`: подпись Forgejo `Good signature`, patch без fuzz |
+| Сборка из заявленного commit | Сверка SRPM COPR с SRPM, собранным локально по `.copr/Makefile` от `764bcd1` | Build `11196643`: 15 файлов-источников совпали по SHA-256; обработанный `forgejo.spec` с `%autochangelog` совпал, кроме строки с версией `rpmautospec` (0.8.4 у COPR, 0.8.5 локально). Сборка запущена через `build-package` |
 | Чистая сборка EPEL 10 | COPR `epel-10-x86_64` | Build `11196643` — `succeeded` |
 | Чистая сборка Fedora 45 | COPR `fedora-45-x86_64` | Build `11196643` — `succeeded` |
 | PAM включён, EPEL 10 | `go version -m`, RPM requires | `11196643`, `forgejo-15.0.10-1.pam1.el10.x86_64.rpm`: tag `pam`, `libpam.so.0` |
