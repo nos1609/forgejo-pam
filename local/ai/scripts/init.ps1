@@ -176,31 +176,6 @@ function Ensure-InstructionLink {
     }
 }
 
-function Ensure-SkillLink {
-    param([string]$Relative, [switch]$Apply)
-    $expected = "../../skills/ai-bootstrap-converge"
-    $path = Join-Path $repoRoot $Relative
-    if (-not (Test-PathInsideRoot $path -AllowLeafLink)) {
-        $script:linkFailures.Add("${Relative}: destination or ancestor escapes the repository or is a link") | Out-Null
-        return
-    }
-    $item = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
-    if ($null -ne $item) {
-        if ((Get-ItemLinkType $item) -eq "SymbolicLink" -and ([string]$item.Target).Replace("\", "/") -eq $expected) { return }
-        $script:linkFailures.Add("$Relative exists but is not the required canonical skill symlink") | Out-Null
-        return
-    }
-    if (-not $Apply) { return }
-    $parent = Split-Path -Parent $path
-    if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-    try {
-        New-Item -ItemType SymbolicLink -Path $path -Target $expected -ErrorAction Stop | Out-Null
-        $script:createdLinks.Add($path) | Out-Null
-    } catch {
-        $script:linkFailures.Add("Could not create the canonical skill symlink at $Relative") | Out-Null
-    }
-}
-
 # Resolve every prerequisite before creating links or changing readiness.
 $git = Get-Command git -ErrorAction SilentlyContinue
 if (-not $git) { throw "Git worktree is required before bootstrap can set local exclusions." }
@@ -279,17 +254,6 @@ $agentsEndMatches = [regex]::Matches($agentsText, "(?m)^$([regex]::Escape($agent
 if ($agentsBeginMatches.Count -ne 1 -or $agentsEndMatches.Count -ne 1 -or
     $agentsBeginMatches[0].Index -ne 0 -or $agentsEndMatches[0].Index -le $agentsBeginMatches[0].Index) {
     throw "AGENTS.md must contain one complete managed instruction block at the top."
-}
-$skillSource = Join-Path $repoRoot "skills/ai-bootstrap-converge"
-$skillItem = Get-Item -LiteralPath $skillSource -Force -ErrorAction SilentlyContinue
-if ($null -eq $skillItem -or -not $skillItem.PSIsContainer -or (Get-ItemLinkType $skillItem) -or -not (Test-PathInsideRoot $skillSource)) {
-    throw "skills/ai-bootstrap-converge must be a non-symlink directory inside the repository."
-}
-$linkedSkillChild = Get-ChildItem -LiteralPath $skillSource -Recurse -Force |
-    Where-Object { Get-ItemLinkType $_ } |
-    Select-Object -First 1
-if ($null -ne $linkedSkillChild) {
-    throw "skills/ai-bootstrap-converge must not contain symlinked children."
 }
 $destinationRelatives = New-Object System.Collections.Generic.List[string]
 foreach ($relative in @('README.md', 'README.en.md', 'local/ai/bootstrap.ready', 'local/ai/chat_context.md')) {
@@ -370,9 +334,6 @@ $links = @(
 foreach ($link in $links) {
     Ensure-InstructionLink $link.Path $link.Target
 }
-foreach ($path in @(".agents/skills/ai-bootstrap-converge", ".claude/skills/ai-bootstrap-converge")) {
-    Ensure-SkillLink $path
-}
 if ($linkFailures.Count -gt 0) {
     foreach ($failure in $linkFailures) { Write-Error $failure -ErrorAction Continue }
     throw "Bootstrap stopped before readiness changes because instruction conflicts remain."
@@ -380,9 +341,6 @@ if ($linkFailures.Count -gt 0) {
 
 foreach ($link in $links) {
     Ensure-InstructionLink $link.Path $link.Target -Apply
-}
-foreach ($path in @(".agents/skills/ai-bootstrap-converge", ".claude/skills/ai-bootstrap-converge")) {
-    Ensure-SkillLink $path -Apply
 }
 if ($linkFailures.Count -gt 0) {
     foreach ($created in $createdLinks) {

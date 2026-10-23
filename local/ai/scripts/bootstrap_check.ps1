@@ -285,20 +285,6 @@ if (-not $agentsSourceSafe) {
     }
 }
 
-$skillSourcePath = Join-Path $repoRoot "skills/ai-bootstrap-converge"
-$skillSource = Get-Item -LiteralPath $skillSourcePath -Force -ErrorAction SilentlyContinue
-$skillSourceSafe = $null -ne $skillSource -and $skillSource.PSIsContainer -and
-    -not (Get-ItemLinkType $skillSource) -and (Test-PathTreeSafe $skillSource.FullName)
-if ($skillSourceSafe) {
-    $linkedSkillChild = Get-ChildItem -LiteralPath $skillSourcePath -Recurse -Force |
-        Where-Object { Get-ItemLinkType $_ } |
-        Select-Object -First 1
-    $skillSourceSafe = $null -eq $linkedSkillChild
-}
-if (-not $skillSourceSafe) {
-    Write-Fail "Канонический каталог skill отсутствует или небезопасен" "Canonical skill directory missing or unsafe"
-}
-
 $links = @(
     @{ Path = ".github/copilot-instructions.md"; Target = "../AGENTS.md" },
     @{ Path = ".claude/CLAUDE.md"; Target = "../AGENTS.md" },
@@ -328,22 +314,6 @@ foreach ($link in $links) {
         Write-Fail "$($link.Path) не использует точную ссылку на AGENTS.md" "$($link.Path) does not use the required AGENTS.md link"
     } else {
         Write-Ok "$($link.Path) связан с AGENTS.md" "$($link.Path) uses the required AGENTS.md link"
-    }
-}
-
-$skillLinks = @(
-    @{ Path = ".agents/skills/ai-bootstrap-converge"; Target = "../../skills/ai-bootstrap-converge" },
-    @{ Path = ".claude/skills/ai-bootstrap-converge"; Target = "../../skills/ai-bootstrap-converge" }
-)
-foreach ($link in $skillLinks) {
-    $fullPath = Join-Path $repoRoot $link.Path
-    $item = Get-Item -LiteralPath $link.Path -Force -ErrorAction SilentlyContinue
-    $valid = $skillSourceSafe -and (Test-PathTreeSafe $fullPath -AllowLeafLink) -and $null -ne $item -and (Get-ItemLinkType $item) -eq "SymbolicLink" -and
-        ([string]$item.Target).Replace("\", "/") -eq $link.Target.Replace("\", "/")
-    if ($valid) {
-        Write-Ok "$($link.Path) указывает на канонический skill" "$($link.Path) uses the canonical skill link"
-    } else {
-        Write-Fail "$($link.Path) не использует точную ссылку на канонический skill" "$($link.Path) does not use the required canonical skill link"
     }
 }
 
@@ -446,6 +416,7 @@ $logs = @(
 if (-not $logs) {
     Write-Fail "Логи ассистентов не найдены в local/" "No assistant logs found under local/"
 } else {
+    $convertFromJsonSupportsDateKind = (Get-Command ConvertFrom-Json).Parameters.ContainsKey("DateKind")
     foreach ($log in $logs) {
         try {
             if (-not (Test-PathTreeSafe $log.FullName)) { throw "$($log.FullName) has an unsafe path or ancestor" }
@@ -455,7 +426,11 @@ if (-not $logs) {
                 $source = "$($log.FullName):$($index + 1)"
                 if ([string]::IsNullOrWhiteSpace($lines[$index])) { throw "$source contains a blank JSONL line" }
                 Assert-UniqueJsonObjectKeys $lines[$index] $source
-                $entry = $lines[$index] | ConvertFrom-Json -ErrorAction Stop
+                if ($convertFromJsonSupportsDateKind) {
+                    $entry = $lines[$index] | ConvertFrom-Json -DateKind String -ErrorAction Stop
+                } else {
+                    $entry = $lines[$index] | ConvertFrom-Json -ErrorAction Stop
+                }
                 if ($entry -isnot [pscustomobject]) { throw "$source must contain a JSON object" }
                 Assert-LogEntry $entry $log.Name $log.Directory.Name $source
             }
