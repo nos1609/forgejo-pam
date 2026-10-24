@@ -41,18 +41,18 @@ dist-git. It does not contain the Forgejo source tree.
 
 - Repository: `forgejo-pam`.
 - RPM package: `forgejo`.
-- Forgejo version: `15.0.7`.
-- Fedora baseline: commit `ced1aa24b245770d46e72e14d18b323aba3dbf3f`.
+- Forgejo version: `15.0.10`.
+- Fedora baseline: commit `7e49254f963a7c488c654af213fee4e3e6b2c815`.
 - Public mirror: [GitHub](https://github.com/nos1609/forgejo-pam).
 - Builds: [COPR `nos1609/forgejo-pam`](https://copr.fedorainfracloud.org/coprs/nos1609/forgejo-pam/).
 
 ## Current status
 
-As of 28 August 2026, the package has successful clean COPR builds for
-`epel-10-x86_64` and `fedora-45-x86_64`. The Fedora 45 target matches the Fedora
-`f45` branch that contains the same Forgejo `15.0.7` baseline. Fedora 45 is
-still in its release cycle, so this is not a build for the current stable
-Fedora 44 release.
+As of 23 October 2026, the package has successful clean COPR builds for
+`epel-10-x86_64` and `fedora-45-x86_64`, build `11196643`. The Fedora 45 target
+matches the Fedora `f45` branch that contains the same Forgejo `15.0.10`
+baseline. Fedora 45 is still in its release cycle on that date (`frozen` in
+Bodhi), so this is not a build for the current stable Fedora 44 release.
 
 The repository and COPR do not change a running Forgejo instance. A successful
 build does not prove PAM login, git-over-SSH, or database migration rollback on
@@ -75,20 +75,29 @@ This delta extends the service privileges. Review
 
 ## Installation
 
-Check the target distribution and available version first:
+Enable the repository first and find the NVR with the `pam1` suffix and the
+dist tag of the target distribution:
 
 ```bash
 sudo dnf copr enable nos1609/forgejo-pam
 dnf --showduplicates list forgejo
 ```
 
-Install only after you prepare a backup and rollback plan:
+Install only after you prepare a backup and rollback plan. Name the verified
+NVR, not the package: dnf picks the highest version, and a Fedora build with a
+higher release, such as `15.0.10-2.fc45`, would replace `15.0.10-1.pam1` without
+the PAM delta.
 
 ```bash
-sudo dnf install forgejo
+sudo dnf install forgejo-<version>-<release>.pam1.<dist>
+rpm -q forgejo
+dnf repoquery --installed --qf '%{from_repo}\n' forgejo
 ```
 
-See `docs/operations.md` for verification and rollback commands.
+Expect an NVR with `pam1` and the repository
+`copr:copr.fedorainfracloud.org:nos1609:forgejo-pam`. As of 23 October 2026,
+the EL10 NVR is `forgejo-15.0.10-1.pam1.el10`. See `docs/operations.md` for the
+pre-install RPM check, post-install verification, and rollback.
 
 ## Branches and publication
 
