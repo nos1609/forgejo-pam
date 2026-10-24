@@ -139,36 +139,6 @@ ensure_instruction_link() {
   fi
 }
 
-ensure_skill_link() {
-  local relative=$1
-  local apply=${2:-0}
-  local expected=../../skills/ai-bootstrap-converge
-  local path=$REPO_ROOT/$relative
-  if ! path_tree_is_safe "$path" 1; then
-    echo "ERROR: $relative: destination or ancestor escapes the repository or is a link." >&2
-    link_failures=$((link_failures + 1))
-    return
-  fi
-  if [[ -L "$path" && "$(readlink "$path")" == "$expected" ]]; then
-    return
-  fi
-  if path_present "$path"; then
-    echo "ERROR: $relative exists but is not the required canonical skill symlink." >&2
-    link_failures=$((link_failures + 1))
-    return
-  fi
-  if [[ "$apply" -ne 1 ]]; then
-    return 0
-  fi
-  mkdir -p "$(dirname "$path")"
-  if ln -s "$expected" "$path" 2>/dev/null; then
-    created_links+=("$path")
-  else
-    echo "ERROR: could not create the canonical skill symlink at $relative." >&2
-    link_failures=$((link_failures + 1))
-  fi
-}
-
 # Resolve all prerequisites before creating any link.
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "ERROR: Git worktree is required before bootstrap can set local exclusions." >&2
@@ -233,14 +203,6 @@ if ! awk '
   END { exit(begin_count == 1 && end_count == 1 && begin_line == 1 && end_line > begin_line ? 0 : 1) }
 ' AGENTS.md; then
   echo "ERROR: AGENTS.md must contain one complete managed instruction block at the top." >&2
-  exit 1
-fi
-if [[ ! -d skills/ai-bootstrap-converge || -L skills/ai-bootstrap-converge ]] || ! path_tree_is_safe "$REPO_ROOT/skills/ai-bootstrap-converge"; then
-  echo "ERROR: skills/ai-bootstrap-converge must be a non-symlink directory inside the repository." >&2
-  exit 1
-fi
-if [[ -n "$(find skills/ai-bootstrap-converge -type l -print -quit)" ]]; then
-  echo "ERROR: skills/ai-bootstrap-converge must not contain symlinked children." >&2
   exit 1
 fi
 for readme in README.md README.en.md; do
@@ -330,9 +292,6 @@ ensure_instruction_link .gemini/GEMINI.md ../AGENTS.md
 ensure_instruction_link GEMINI.md AGENTS.md
 ensure_instruction_link QWEN.md AGENTS.md
 ensure_instruction_link .qwen/QWEN.md ../AGENTS.md
-ensure_skill_link .agents/skills/ai-bootstrap-converge
-ensure_skill_link .claude/skills/ai-bootstrap-converge
-
 if [[ "$link_failures" -gt 0 ]]; then
   echo "Bootstrap stopped before readiness changes because instruction conflicts remain." >&2
   exit 1
@@ -345,8 +304,6 @@ ensure_instruction_link .gemini/GEMINI.md ../AGENTS.md 1
 ensure_instruction_link GEMINI.md AGENTS.md 1
 ensure_instruction_link QWEN.md AGENTS.md 1
 ensure_instruction_link .qwen/QWEN.md ../AGENTS.md 1
-ensure_skill_link .agents/skills/ai-bootstrap-converge 1
-ensure_skill_link .claude/skills/ai-bootstrap-converge 1
 if [[ "$link_failures" -gt 0 ]]; then
   for created in "${created_links[@]}"; do
     rm -f -- "$created"
