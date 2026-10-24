@@ -1,0 +1,13 @@
+[Unit]
+Description=Watch /etc and reapply Forgejo ACL on /etc/shadow
+Documentation=man:systemd.path(5)
+
+[Path]
+# shadow-utils replaces /etc/shadow by rename; PathChanged= on the file itself
+# does not report that, so watch the directory. Defaults kept on purpose:
+# TriggerLimitIntervalSec=2s, TriggerLimitBurst=200.
+PathChanged=/etc
+Unit=forgejo-shadow-acl.service
+
+[Install]
+WantedBy=multi-user.target
