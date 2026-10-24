@@ -332,19 +332,28 @@ sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r--[[:space:]]+#effective
 
 ```bash
 sudo setfacl -x u:forgejo /etc/shadow
-sleep 2   # path unit запускает service
-while [ "$(systemctl show -p ActiveState --value forgejo-shadow-acl.service)" = activating ]; do
+ok=0
+for _ in $(seq 30); do
   sleep 1
+  if sudo getfacl -cpe /etc/shadow | grep -qE '^user:forgejo:r--[[:space:]]+#effective:r--$' &&
+     [ "$(systemctl show -p ActiveState --value forgejo-shadow-acl.service)" != activating ]; then
+    ok=1; break
+  fi
 done
-sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r--[[:space:]]+#effective:r--$'
-sudo journalctl -u forgejo-shadow-acl.service -p warning --since -1min --no-pager
+if [ "$ok" -eq 1 ]; then
+  sudo journalctl -u forgejo-shadow-acl.service -p warning --since -1min --no-pager
+else
+  echo "ACL not restored in 30 s; forgejo-shadow-acl.service: $(systemctl show -p ActiveState --value forgejo-shadow-acl.service)"
+  false
+fi
 ```
 
-ACL возвращается примерно через 3 секунды. Строка в журнале появляется после
-завершения запуска, примерно через 8 секунд: после `setfacl` скрипт ещё 5
-секунд ждёт повторной проверки маркера. Поэтому проверка ждёт конца запуска, а
-не фиксированное время. Ожидается ровно `user:forgejo:r--` с `#effective:r--`,
-в журнале — `reapplied u:forgejo:r on /etc/shadow`. Если ACL не вернулся, восстановите его
+Блок ждёт до 30 секунд, пока не появится ровно `user:forgejo:r--` с
+`#effective:r--` и не закончится запуск service, затем показывает журнал. ACL
+возвращается примерно через 3 секунды, строка в журнале — примерно через 8
+секунд: после `setfacl` скрипт ещё 5 секунд ждёт повторной проверки маркера.
+Ожидается `reapplied u:forgejo:r on /etc/shadow`. По тайм-ауту блок выводит
+состояние service и завершается с ошибкой. Если ACL не вернулся, восстановите его
 командой `sudo setfacl -m u:forgejo:r /etc/shadow` и перейдите к диагностике.
 Отказ при суженной маске на `/etc/shadow` не воспроизводите: он оставляет PAM без
 доступа до ручного восстановления.
