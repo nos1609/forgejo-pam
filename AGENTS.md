@@ -47,3 +47,16 @@
 4) Work: `local/ai/agents/12-general.md`, `local/ai/agents/03-sandbox.md`, `local/ai/agents/11-cli-bootstrap.md`, `local/ai/agents/08-checks.md`, `local/ai/agents/04-formatting.md`
 5) Handoff/closure: `local/ai/agents/10-handoff.md`, `local/ai/agents/09-closure.md`
 <!-- AI AGENT INSTRUCTIONS END -->
+
+## Облачные агенты (Jules) / Cloud agents (Jules)
+
+- RU: В облачной VM нет локальных файлов `local/ai/*` (`chat_context.md`, журналы, сводки). Начинайте с `docs/WRITING_STANDARD.md` и `docs/operations.md`. Журнал hard-gate пишите в `local/ai/<assistant>/requests.log`: `contrib/jules/setup.sh` исключает его через `.git/info/exclude`.
+  EN: The cloud VM has no local `local/ai/*` files (`chat_context.md`, logs, summaries). Start with `docs/WRITING_STANDARD.md` and `docs/operations.md`. Write the hard-gate log to `local/ai/<assistant>/requests.log`; `contrib/jules/setup.sh` excludes it through `.git/info/exclude`.
+- RU: Не добавляйте в коммиты `local/ai/**` и `tmp/**` и не меняйте ради них `.gitignore`.
+  EN: Never commit `local/ai/**` or `tmp/**`, and do not edit `.gitignore` for them.
+- RU: Работайте в отдельной ветке и открывайте PR в `main`. Merge — только после вердикта CodeRabbit по последнему commit (`docs/operations.md`, «Порядок изменений»).
+  EN: Work in a separate branch and open a PR to `main`. Merge only after the CodeRabbit verdict on the latest commit (`docs/operations.md`, change workflow).
+- RU: VM Jules работает на Ubuntu: `rpmbuild`, `mock` и макросы Fedora недоступны. Изменения `forgejo.spec` проверяет сборка COPR; в VM выполните проверки из `contrib/jules/setup.sh`.
+  EN: The Jules VM runs Ubuntu: `rpmbuild`, `mock` and Fedora macros are unavailable. The COPR build validates `forgejo.spec` changes; in the VM, run the checks from `contrib/jules/setup.sh`.
+- RU: Коммиты для GitHub подписываются адресом GitHub noreply; не включайте личные данные, адреса хостов и секреты в коммиты, PR и комментарии.
+  EN: Commits for GitHub use the GitHub noreply address; keep personal data, host addresses and secrets out of commits, PRs and comments.
