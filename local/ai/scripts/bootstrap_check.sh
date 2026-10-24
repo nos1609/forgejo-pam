@@ -126,14 +126,6 @@ check_symlinks() {
     fail "AGENTS.md не содержит один полный управляемый блок в начале" "AGENTS.md does not have one complete managed block at the top"
   fi
 
-  local skill_source_safe=1
-  if [[ ! -d skills/ai-bootstrap-converge || -L skills/ai-bootstrap-converge ]] ||
-    ! path_tree_is_safe "$REPO_ROOT/skills/ai-bootstrap-converge" ||
-    [[ -n "$(find skills/ai-bootstrap-converge -type l -print -quit 2>/dev/null)" ]]; then
-    fail "Канонический каталог skill отсутствует или небезопасен" "Canonical skill directory missing or unsafe"
-    skill_source_safe=0
-  fi
-
   local links=(
     ".github/copilot-instructions.md|../AGENTS.md"
     ".claude/CLAUDE.md|../AGENTS.md"
@@ -150,19 +142,6 @@ check_symlinks() {
     check_symlink "$path" "$expected"
   done
 
-  local skill_links=(
-    ".agents/skills/ai-bootstrap-converge|../../skills/ai-bootstrap-converge"
-    ".claude/skills/ai-bootstrap-converge|../../skills/ai-bootstrap-converge"
-  )
-  for item in "${skill_links[@]}"; do
-    path=${item%%|*}
-    expected=${item#*|}
-    if [[ "$skill_source_safe" -eq 1 ]] && path_tree_is_safe "$REPO_ROOT/$path" 1 && [[ -L "$path" ]] && [[ "$(readlink "$path")" == "$expected" ]]; then
-      ok "$path указывает на канонический skill" "$path uses the canonical skill link"
-    else
-      fail "$path не использует точную ссылку на канонический skill" "$path does not use the required canonical skill link"
-    fi
-  done
 }
 
 load_patterns_from_bootstrap_ready() {
@@ -276,7 +255,7 @@ check_logs() {
     return
   fi
 
-  local validator="skills/ai-bootstrap-converge/scripts/validate_logs.py"
+  local validator="local/ai/scripts/validate_logs.py"
   if [[ ! -f "$validator" || -L "$validator" ]] || ! path_tree_is_safe "$REPO_ROOT/$validator"; then
     fail "$validator отсутствует или небезопасен" "$validator missing or unsafe"
     return
