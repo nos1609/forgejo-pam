@@ -15,9 +15,9 @@ dist-git, патчей к стороннему исходному коду, Forg
 
 Основа упаковки получена из
 [Fedora Forgejo dist-git](https://src.fedoraproject.org/rpms/forgejo) с commit
-`ced1aa24b245770d46e72e14d18b323aba3dbf3f`. Fedora Project Contributor
+`7e49254f963a7c488c654af213fee4e3e6b2c815`. Fedora Project Contributor
 Agreement использует MIT как лицензию по умолчанию для кода без явно указанной
-[лицензии](https://fedoraproject.org/wiki/Legal_talk:Fedora_Project_Contributor_Agreement),
+[лицензии](https://docs.fedoraproject.org/en-US/legal/fpca/),
 но не отменяет явные лицензии и права сторонних авторов.
 
 Исходный архив Forgejo и его подпись не хранятся в этом Git-репозитории.

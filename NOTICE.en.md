@@ -16,8 +16,8 @@ and RPM content.
 
 The packaging baseline comes from
 [Fedora Forgejo dist-git](https://src.fedoraproject.org/rpms/forgejo), commit
-`ced1aa24b245770d46e72e14d18b323aba3dbf3f`. The Fedora Project Contributor
-[Agreement](https://fedoraproject.org/wiki/Legal_talk:Fedora_Project_Contributor_Agreement)
+`7e49254f963a7c488c654af213fee4e3e6b2c815`. The Fedora Project Contributor
+[Agreement](https://docs.fedoraproject.org/en-US/legal/fpca/)
 uses MIT as the default license for code without an explicit license. It does
 not override explicit licenses or third-party rights.
 
