@@ -1,0 +1,44 @@
+---
+language: "ru-RU"
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  review_details: true
+  poem: false
+  fail_commit_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+      - "rawhide"
+  path_instructions:
+    - path: "forgejo.spec"
+      instructions: >-
+        Check RPM macro expansion, Source and Patch numbering, BuildRequires,
+        release ordering, scriptlet idempotence, uninstall cleanup, and parity
+        between install output and the files manifest.
+    - path: ".copr/**"
+      instructions: >-
+        Check source authenticity, checksum and signature verification,
+        reproducibility, output directory handling, and that binary builds do
+        not require network access.
+    - path: "forgejo-init.sh"
+      instructions: >-
+        Check strict-mode behavior, quoting, secret generation, permissions,
+        repeat execution, and failure handling.
+    - path: "forgejo-pam-caps.conf"
+      instructions: >-
+        Enforce least privilege for systemd capabilities and prevent privilege
+        expansion unrelated to PAM authentication.
+    - path: "forgejo_chkpwd_fix.te"
+      instructions: >-
+        Enforce least privilege and reject SELinux allow rules broader than the
+        unix_chkpwd PAM authentication path requires.
+
+chat:
+  auto_reply: true
