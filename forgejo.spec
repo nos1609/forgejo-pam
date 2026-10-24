@@ -61,8 +61,8 @@ BuildRequires:  coreutils
 BuildRequires:  checkpolicy
 BuildRequires:  gnupg2
 BuildRequires:  go-rpm-macros
-BuildRequires:  golang-bin >= 1.23
-BuildRequires:  golang-src >= 1.23
+BuildRequires:  golang-bin >= 1.26.0
+BuildRequires:  golang-src >= 1.26.0
 BuildRequires:  go-vendor-tools
 BuildRequires:  make
 BuildRequires:  policycoreutils
