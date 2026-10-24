@@ -22,4 +22,15 @@ if awk '$1 ~ /^(user:[^:]+|group:[^:]*):/ && $1 !~ /^user:forgejo:/ && $2 ~ /^#e
     exit 1
 fi
 setfacl -m u:forgejo:r /etc/shadow
+# %postun of an erase may remove the ACL and then the marker between the marker
+# check above and setfacl. It removes the marker right after the ACL, so check
+# again after a pause and undo this run's change if the package no longer owns
+# the ACL. rpm's transaction lock is not used: without a terminal rpm does not
+# wait for it and a concurrent dnf transaction would fail.
+sleep 5
+if [ ! -e /var/lib/rpm-state/forgejo/shadow-acl-owned ]; then
+    setfacl -x u:forgejo /etc/shadow 2>/dev/null || :
+    echo "<4>forgejo package removed during this run; u:forgejo removed from /etc/shadow again"
+    exit 0
+fi
 echo "<4>reapplied u:forgejo:r on /etc/shadow"
