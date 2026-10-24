@@ -332,13 +332,19 @@ sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r--[[:space:]]+#effective
 
 ```bash
 sudo setfacl -x u:forgejo /etc/shadow
-sleep 5
+sleep 2   # path unit запускает service
+while [ "$(systemctl show -p ActiveState --value forgejo-shadow-acl.service)" = activating ]; do
+  sleep 1
+done
 sudo getfacl -cpe /etc/shadow | grep -E '^user:forgejo:r--[[:space:]]+#effective:r--$'
 sudo journalctl -u forgejo-shadow-acl.service -p warning --since -1min --no-pager
 ```
 
-Ожидается ровно `user:forgejo:r--` с `#effective:r--`, в журнале —
-`reapplied u:forgejo:r on /etc/shadow`. Если ACL не вернулся, восстановите его
+ACL возвращается примерно через 3 секунды. Строка в журнале появляется после
+завершения запуска, примерно через 8 секунд: после `setfacl` скрипт ещё 5
+секунд ждёт повторной проверки маркера. Поэтому проверка ждёт конца запуска, а
+не фиксированное время. Ожидается ровно `user:forgejo:r--` с `#effective:r--`,
+в журнале — `reapplied u:forgejo:r on /etc/shadow`. Если ACL не вернулся, восстановите его
 командой `sudo setfacl -m u:forgejo:r /etc/shadow` и перейдите к диагностике.
 Отказ при суженной маске на `/etc/shadow` не воспроизводите: он оставляет PAM без
 доступа до ручного восстановления.
