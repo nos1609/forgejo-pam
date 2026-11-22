@@ -47,3 +47,13 @@ expression = "ICU AND MIT"
 path = "vendor/go.yaml.in/yaml/v3/LICENSE"
 sha256sum = "d18f6323b71b0b768bb5e9616e36da390fbd39369a81807cca352de4e4e6aa0b"
 expression = "Apache-2.0 AND MIT"
+
+[[licensing.licenses]]
+path = "vendor/github.com/xi2/xz/LICENSE"
+sha256sum = "5c640056d513f276d56635af7a0bed81cb7eac02a31b6e56d40c416557a8d8ce"
+expression = "LicenseRef-Fedora-Public-Domain"
+
+[[licensing.licenses]]
+path = "vendor/pault.ag/go/debian/LICENSE"
+sha256sum = "e60079a6a94467d91401023685e8afae40950582c938f9db01d2e9676c6fe944"
+expression = "BSD-3-Clause AND MIT"
